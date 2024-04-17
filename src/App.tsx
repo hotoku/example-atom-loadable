@@ -1,10 +1,11 @@
 import { Suspense, useEffect, useState } from "react";
 import "./App.css";
-import { Item, getRoot } from "./api";
+import { getRoot } from "./api";
 import Loadable from "./loadable";
+import { RootNode, ValueNode } from "./model";
 
 function useItems(n: number) {
-  const [items, setItems] = useState<Loadable<Item[]> | null>(null);
+  const [items, setItems] = useState<Loadable<RootNode> | null>(null);
 
   useEffect(() => {
     console.log("useEffect");
@@ -16,24 +17,48 @@ function useItems(n: number) {
   return items;
 }
 
-type ItemListProps = {
-  items: Loadable<Item[]>;
-};
-function ItemList({ items }: ItemListProps): JSX.Element {
-  const handleClick = () => {
-    console.log("clicked");
-  };
-
+function TreeNode({
+  nodeLoadable,
+}: {
+  nodeLoadable: Loadable<ValueNode>;
+}): JSX.Element {
+  const node = nodeLoadable.getOrThrow();
   return (
     <div>
-      <ul>
-        {items.getOrThrow().map((i) => (
-          <li key={i.id}>
-            {i.name}
-            <button onClick={handleClick}>show child</button>
-          </li>
-        ))}
-      </ul>
+      <div>{node.name}</div>
+      {node.children !== null ? (
+        <TreeArray nodeLoadables={node.children} />
+      ) : null}
+    </div>
+  );
+}
+
+function TreeArray({
+  nodeLoadables,
+}: {
+  nodeLoadables: Loadable<Loadable<ValueNode>[]>;
+}): JSX.Element {
+  const nodes = nodeLoadables.getOrThrow();
+  return (
+    <div>
+      {nodes.map((n) => (
+        <TreeNode nodeLoadable={n} />
+      ))}
+    </div>
+  );
+}
+
+function TreeRoot({ nodeLoadable }: { nodeLoadable: Loadable<RootNode> }) {
+  const node = nodeLoadable.getOrThrow();
+  if (node.children === null) {
+    throw new Error("panic");
+  }
+  return (
+    <div>
+      <div>{"root"}</div>
+      <Suspense fallback={<div>Loading...</div>}>
+        <TreeArray nodeLoadables={node.children} />
+      </Suspense>
     </div>
   );
 }
@@ -44,7 +69,11 @@ function App() {
   return (
     <>
       <Suspense fallback={<div>Loading...</div>}>
-        {items ? <ItemList items={items} /> : <div>before loading...</div>}
+        {items ? (
+          <TreeRoot nodeLoadable={items} />
+        ) : (
+          <div>before loading...</div>
+        )}
       </Suspense>
     </>
   );
