@@ -22,7 +22,7 @@ function NodeName({
   nodeLoadable: LoadableWithAttr<ValueNode, { id: number }>;
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
-  return <div>{node.name}</div>;
+  return <span>{node.name}</span>;
 }
 
 function TreeNode({
@@ -48,11 +48,13 @@ function TreeArray({
 }): JSX.Element {
   const nodes = nodeLoadables.getOrThrow();
   return (
-    <div>
+    <ul>
       {nodes.map((n) => (
-        <TreeNode key={n.attr.id} nodeLoadable={n} />
+        <li key={n.attr.id}>
+          <TreeNode nodeLoadable={n} />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -63,7 +65,7 @@ function TreeRoot({ nodeLoadable }: { nodeLoadable: Loadable<RootNode> }) {
   }
   return (
     <div>
-      <div>{"root"}</div>
+      <h1>todree</h1>
       <Suspense fallback={<div>Loading...</div>}>
         <TreeArray nodeLoadables={node.children} />
       </Suspense>

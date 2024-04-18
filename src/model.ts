@@ -21,20 +21,19 @@ export class ValueNode extends Node {
 }
 
 export class RootNode extends Node {
-  static create(prm: Promise<Item[]>): Promise<RootNode> {
-    return prm.then((items) => {
-      const ret = new RootNode();
-      const children = items.map(
-        (item) =>
-          new LoadableWithAttr(
-            Promise.resolve(new ValueNode(item.id, item.name, ret)),
-            {
-              id: item.id,
-            }
-          )
-      );
-      ret.children = new Loadable(Promise.resolve(children));
-      return ret;
-    });
+  static async create(prm: Promise<Item[]>): Promise<RootNode> {
+    const items = await prm;
+    const ret = new RootNode();
+    const children = items.map(
+      (item) =>
+        new LoadableWithAttr(
+          Promise.resolve(new ValueNode(item.id, item.name, ret)),
+          {
+            id: item.id,
+          }
+        )
+    );
+    ret.children = new Loadable(Promise.resolve(children));
+    return ret;
   }
 }
