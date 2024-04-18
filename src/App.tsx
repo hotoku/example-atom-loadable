@@ -16,7 +16,7 @@ function useItems() {
   return items;
 }
 
-function NodeName({
+function NodeLine({
   nodeLoadable,
 }: {
   nodeLoadable: LoadableWithAttr<ValueNode, { id: number }>;
@@ -33,7 +33,7 @@ function TreeNode({
   const node = nodeLoadable.getOrThrow();
   return (
     <div>
-      <NodeName nodeLoadable={nodeLoadable} />
+      <NodeLine nodeLoadable={nodeLoadable} />
       {node.children !== null ? (
         <TreeArray nodeLoadables={node.children} />
       ) : null}
