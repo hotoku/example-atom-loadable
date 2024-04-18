@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from "react";
+import { ChangeEvent, Suspense, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { Loadable, LoadableWithAttr } from "./loadable";
 import { RootNode, ValueNode, getRoot } from "./model";
@@ -16,6 +16,38 @@ function useItems() {
   return items;
 }
 
+function NodeEditor({
+  node,
+  onFinish,
+}: {
+  node: ValueNode;
+  onFinish: () => void;
+}): JSX.Element {
+  const [value, setValue] = useState(node.name);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    setValue(e.target.value);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.key !== "Enter") return;
+    onFinish();
+  };
+  return (
+    <input
+      value={value}
+      ref={ref}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+    />
+  );
+}
+
 function NodeLine({
   nodeLoadable,
   updateParent,
@@ -24,10 +56,17 @@ function NodeLine({
   updateParent: () => void;
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
 
   const handleToggle = () => {
     node.toggle();
     updateParent();
+  };
+
+  const startEdit = () => {
+    if (editing) return;
+    setEditing(true);
   };
 
   return (
@@ -35,7 +74,11 @@ function NodeLine({
       <button onClick={handleToggle} style={{ marginRight: "3px" }}>
         {node.open ? "-" : "+"}
       </button>
-      <span>{node.name}</span>
+      {editing ? (
+        <NodeEditor node={node} onFinish={() => setEditing(false)} />
+      ) : (
+        <span onClick={startEdit}>{node.name}</span>
+      )}
     </span>
   );
 }
