@@ -23,7 +23,7 @@ function NodeEditor({
   node: ValueNode;
   onFinish: () => void;
 }): JSX.Element {
-  const [value, setValue] = useState(node.name);
+  const [value, setValue] = useState(node.name.getOrThrow());
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     ref.current?.focus();
@@ -57,7 +57,6 @@ function NodeLine({
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState("");
 
   const handleToggle = () => {
     node.toggle();
@@ -77,7 +76,7 @@ function NodeLine({
       {editing ? (
         <NodeEditor node={node} onFinish={() => setEditing(false)} />
       ) : (
-        <span onClick={startEdit}>{node.name}</span>
+        <span onClick={startEdit}>{node.name.getOrThrow()}</span>
       )}
     </span>
   );

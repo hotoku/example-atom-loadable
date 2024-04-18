@@ -11,12 +11,12 @@ export class Node {
 
 export class ValueNode extends Node {
   id: number;
-  name: string;
+  name: Loadable<string>;
   parent: Node;
   constructor(id: number, name: string, parent: Node) {
     super();
     this.id = id;
-    this.name = name;
+    this.name = new Loadable(Promise.resolve(name));
     this.parent = parent;
   }
 
