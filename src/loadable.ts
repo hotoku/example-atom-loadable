@@ -12,7 +12,7 @@ type LoadableState<T> =
       error: unknown;
     };
 
-class Loadable<T> {
+export class Loadable<T> {
   state: LoadableState<T>;
   constructor(promise: Promise<T>) {
     this.state = {
@@ -47,4 +47,10 @@ class Loadable<T> {
   }
 }
 
-export default Loadable;
+export class LoadableWithAttr<T, A> extends Loadable<T> {
+  attr: A;
+  constructor(promise: Promise<T>, attr: A) {
+    super(promise);
+    this.attr = attr;
+  }
+}

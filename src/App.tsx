@@ -1,31 +1,39 @@
 import { Suspense, useEffect, useState } from "react";
 import "./App.css";
 import { getRoot } from "./api";
-import Loadable from "./loadable";
+import { Loadable, LoadableWithAttr } from "./loadable";
 import { RootNode, ValueNode } from "./model";
 
-function useItems(n: number) {
+function useItems() {
   const [items, setItems] = useState<Loadable<RootNode> | null>(null);
 
   useEffect(() => {
-    console.log("useEffect");
-    new Promise((resolve) => setTimeout(resolve, n * 1000)).then(() => {
+    new Promise((resolve) => setTimeout(resolve, 1000)).then(() => {
       setItems(new Loadable(getRoot()));
     });
-  }, [n]);
+  }, []);
 
   return items;
+}
+
+function NodeName({
+  nodeLoadable,
+}: {
+  nodeLoadable: LoadableWithAttr<ValueNode, { id: number }>;
+}): JSX.Element {
+  const node = nodeLoadable.getOrThrow();
+  return <div>{node.name}</div>;
 }
 
 function TreeNode({
   nodeLoadable,
 }: {
-  nodeLoadable: Loadable<ValueNode>;
+  nodeLoadable: LoadableWithAttr<ValueNode, { id: number }>;
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
   return (
     <div>
-      <div>{node.name}</div>
+      <NodeName nodeLoadable={nodeLoadable} />
       {node.children !== null ? (
         <TreeArray nodeLoadables={node.children} />
       ) : null}
@@ -36,13 +44,13 @@ function TreeNode({
 function TreeArray({
   nodeLoadables,
 }: {
-  nodeLoadables: Loadable<Loadable<ValueNode>[]>;
+  nodeLoadables: Loadable<LoadableWithAttr<ValueNode, { id: number }>[]>;
 }): JSX.Element {
   const nodes = nodeLoadables.getOrThrow();
   return (
     <div>
       {nodes.map((n) => (
-        <TreeNode nodeLoadable={n} />
+        <TreeNode key={n.attr.id} nodeLoadable={n} />
       ))}
     </div>
   );
@@ -64,7 +72,7 @@ function TreeRoot({ nodeLoadable }: { nodeLoadable: Loadable<RootNode> }) {
 }
 
 function App() {
-  const items = useItems(1);
+  const items = useItems();
 
   return (
     <>

@@ -1,8 +1,8 @@
 import { Item } from "./api";
-import Loadable from "./loadable";
+import { Loadable, LoadableWithAttr } from "./loadable";
 
 export class Node {
-  children: Loadable<Loadable<ValueNode>[]> | null;
+  children: Loadable<LoadableWithAttr<ValueNode, { id: number }>[]> | null;
   constructor() {
     this.children = null;
   }
@@ -26,7 +26,12 @@ export class RootNode extends Node {
       const ret = new RootNode();
       const children = items.map(
         (item) =>
-          new Loadable(Promise.resolve(new ValueNode(item.id, item.name, ret)))
+          new LoadableWithAttr(
+            Promise.resolve(new ValueNode(item.id, item.name, ret)),
+            {
+              id: item.id,
+            }
+          )
       );
       ret.children = new Loadable(Promise.resolve(children));
       return ret;
