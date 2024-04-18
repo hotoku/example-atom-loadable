@@ -3,6 +3,8 @@ import "./App.css";
 import { Loadable, LoadableWithAttr } from "./loadable";
 import { RootNode, ValueNode, getRoot } from "./model";
 import { useUpdate } from "./hooks";
+import { useAtomValue } from "jotai";
+import { selectedIdAtom } from "./atoms";
 
 function useItems() {
   const [items, setItems] = useState<Loadable<RootNode> | null>(null);
@@ -16,14 +18,14 @@ function useItems() {
   return items;
 }
 
-function NodeEditor({
-  node,
+function LineEditor({
+  initialValue,
   onFinish,
 }: {
-  node: ValueNode;
-  onFinish: () => void;
+  initialValue: string;
+  onFinish: (s: string) => void;
 }): JSX.Element {
-  const [value, setValue] = useState(node.name.getOrThrow());
+  const [value, setValue] = useState(initialValue);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     ref.current?.focus();
@@ -36,7 +38,7 @@ function NodeEditor({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing || e.key !== "Enter") return;
-    onFinish();
+    onFinish(value);
   };
   return (
     <input
@@ -57,6 +59,8 @@ function NodeLine({
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
   const [editing, setEditing] = useState(false);
+  const selectedId = useAtomValue(selectedIdAtom);
+  const alpha = selectedId === node.id ? 1 : 0.2;
 
   const handleToggle = () => {
     node.toggle();
@@ -68,15 +72,37 @@ function NodeLine({
     setEditing(true);
   };
 
+  const onEditEnd = (v: string) => {
+    node.updateName(v);
+    setEditing(false);
+  };
+
   return (
     <span>
-      <button onClick={handleToggle} style={{ marginRight: "3px" }}>
+      <button
+        onClick={handleToggle}
+        style={{ marginRight: "3px", backgroundColor: `rgba(1,1,1,${alpha})` }}
+      >
         {node.open ? "-" : "+"}
       </button>
       {editing ? (
-        <NodeEditor node={node} onFinish={() => setEditing(false)} />
+        <LineEditor
+          initialValue={node.name.getOrThrow()}
+          onFinish={onEditEnd}
+        />
       ) : (
-        <span onClick={startEdit}>{node.name.getOrThrow()}</span>
+        <span
+          style={{
+            display: "inline-block",
+            width: "30rem",
+            backgroundColor:
+              import.meta.env.MODE === "development" ? "#f0f0f0" : "",
+            paddingLeft: "5px",
+          }}
+          onClick={startEdit}
+        >
+          {node.name.getOrThrow()}
+        </span>
       )}
     </span>
   );
@@ -91,7 +117,7 @@ function TreeNode({
   const { update } = useUpdate();
   return (
     <div>
-      <Suspense>
+      <Suspense fallback={<div>Loading...</div>}>
         <NodeLine nodeLoadable={nodeLoadable} updateParent={update} />
       </Suspense>
       {node.children !== null && node.open ? (
@@ -129,7 +155,6 @@ function TreeRoot({ nodeLoadable }: { nodeLoadable: Loadable<RootNode> }) {
   }
   return (
     <div>
-      <h1>todree</h1>
       <Suspense fallback={<div>Loading...</div>}>
         <TreeArray nodeLoadables={node.children} />
       </Suspense>
@@ -142,6 +167,7 @@ function App() {
 
   return (
     <>
+      <h1>todree</h1>
       <Suspense fallback={<div>Loading...</div>}>
         {items ? (
           <TreeRoot nodeLoadable={items} />

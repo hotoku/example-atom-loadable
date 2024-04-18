@@ -1,4 +1,4 @@
-import { Item, loadChildren, loadRoot } from "./api";
+import { Item, loadChildren, loadRoot, updateName } from "./api";
 import { Loadable, LoadableWithAttr } from "./loadable";
 
 export class Node {
@@ -38,6 +38,13 @@ export class ValueNode extends Node {
     } else {
       return Promise.resolve();
     }
+  }
+
+  async updateName(v: string): Promise<void> {
+    const updating = updateName(this.id, v);
+    this.name = new Loadable(updating);
+    await updating;
+    return;
   }
 }
 

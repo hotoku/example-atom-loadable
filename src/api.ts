@@ -33,3 +33,17 @@ export function loadChildren(parent: number): Promise<Item[]> {
 
   return loadingItems;
 }
+
+export function updateName(id: number, v: string): Promise<string> {
+  const updating = new Promise((resolve) => setTimeout(resolve, 1000)).then(
+    () => {
+      const item = Object.values(db).find((item) => item.id === id);
+      if (item === undefined) {
+        throw new Error("Item not found");
+      }
+      item.name = v;
+      return v;
+    }
+  );
+  return updating;
+}
