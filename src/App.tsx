@@ -1,8 +1,8 @@
 import { Suspense, useEffect, useState } from "react";
 import "./App.css";
-import { getRoot } from "./api";
 import { Loadable, LoadableWithAttr } from "./loadable";
-import { RootNode, ValueNode } from "./model";
+import { RootNode, ValueNode, getRoot } from "./model";
+import { useUpdate } from "./hooks";
 
 function useItems() {
   const [items, setItems] = useState<Loadable<RootNode> | null>(null);
@@ -18,11 +18,26 @@ function useItems() {
 
 function NodeLine({
   nodeLoadable,
+  updateParent,
 }: {
   nodeLoadable: LoadableWithAttr<ValueNode, { id: number }>;
+  updateParent: () => void;
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
-  return <span>{node.name}</span>;
+
+  const handleToggle = () => {
+    node.toggle();
+    updateParent();
+  };
+
+  return (
+    <span>
+      <button onClick={handleToggle} style={{ marginRight: "3px" }}>
+        {node.open ? "-" : "+"}
+      </button>
+      <span>{node.name}</span>
+    </span>
+  );
 }
 
 function TreeNode({
@@ -31,11 +46,16 @@ function TreeNode({
   nodeLoadable: LoadableWithAttr<ValueNode, { id: number }>;
 }): JSX.Element {
   const node = nodeLoadable.getOrThrow();
+  const { update } = useUpdate();
   return (
     <div>
-      <NodeLine nodeLoadable={nodeLoadable} />
-      {node.children !== null ? (
-        <TreeArray nodeLoadables={node.children} />
+      <Suspense>
+        <NodeLine nodeLoadable={nodeLoadable} updateParent={update} />
+      </Suspense>
+      {node.children !== null && node.open ? (
+        <Suspense fallback={<div>Loading...</div>}>
+          <TreeArray nodeLoadables={node.children} />
+        </Suspense>
       ) : null}
     </div>
   );
@@ -51,7 +71,9 @@ function TreeArray({
     <ul>
       {nodes.map((n) => (
         <li key={n.attr.id}>
-          <TreeNode nodeLoadable={n} />
+          <Suspense fallback={<div>Loading...</div>}>
+            <TreeNode nodeLoadable={n} />
+          </Suspense>
         </li>
       ))}
     </ul>

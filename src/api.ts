@@ -1,5 +1,3 @@
-import { RootNode } from "./model";
-
 export type Item = {
   id: number;
   name: string;
@@ -15,13 +13,23 @@ const db: {
   4: { id: 4, name: "four", parent: 2 },
 };
 
-export function getRoot(): Promise<RootNode> {
+export function loadRoot(): Promise<Item[]> {
   const loadingItems = new Promise((resolve) => setTimeout(resolve, 1000)).then(
     () => {
       const items = Object.values(db).filter((item) => item.parent === null);
       return items;
     }
   );
+  return loadingItems;
+}
 
-  return RootNode.create(loadingItems);
+export function loadChildren(parent: number): Promise<Item[]> {
+  const loadingItems = new Promise((resolve) => setTimeout(resolve, 1000)).then(
+    () => {
+      const items = Object.values(db).filter((item) => item.parent === parent);
+      return items;
+    }
+  );
+
+  return loadingItems;
 }
