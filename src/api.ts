@@ -23,6 +23,10 @@ export function loadRoot(): Promise<Item[]> {
   return loadingItems;
 }
 
+export function sleep(n: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, n * 1000));
+}
+
 export function loadChildren(parent: number): Promise<Item[]> {
   const loadingItems = new Promise((resolve) => setTimeout(resolve, 1000)).then(
     () => {
