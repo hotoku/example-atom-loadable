@@ -27,7 +27,7 @@ export class ValueNode extends Node {
         const children = items.map(
           (item) =>
             new LoadableWithAttr(
-              Promise.resolve(new ValueNode(item.id, item.name, this)),
+              Promise.resolve(new ValueNode(item.id, item.content, this)),
               { id: item.id }
             )
         );
@@ -55,7 +55,7 @@ export class RootNode extends Node {
     const children = items.map(
       (item) =>
         new LoadableWithAttr(
-          Promise.resolve(new ValueNode(item.id, item.name, ret)),
+          Promise.resolve(new ValueNode(item.id, item.content, ret)),
           {
             id: item.id,
           }
