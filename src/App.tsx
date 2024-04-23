@@ -1,8 +1,15 @@
-import { Suspense, useEffect } from "react";
-import { ValueNode, getRoot, nextId, previousId, toggle } from "./model3";
-import { rootAtom, selectedIdAtom } from "./atoms";
+import { Suspense, useEffect, useRef, useState } from "react";
+import {
+  ValueNode,
+  getRoot,
+  nextId,
+  previousId,
+  saveContent,
+  toggle,
+} from "./model3";
+import { editingAtom, rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { L, Loadable } from "./loadable";
+import { Loadable, LV, LP } from "./loadable";
 import { sleep } from "./api";
 
 import "./App.css";
@@ -16,21 +23,55 @@ function NodeContent({
   return <span>{content}</span>;
 }
 
+function ContentEditor({ node }: { node: ValueNode }): JSX.Element {
+  const [val, setVal] = useState(node.content.getOrThrow());
+  const setRoot = useSetAtom(rootAtom);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    setVal(e.target.value);
+  };
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.key !== "Enter") return;
+    setRoot((root) => {
+      if (root === null) {
+        throw new Error("panic: root is null");
+      }
+      const newRoot = saveContent(root.getOrThrow(), node, val);
+      return LV(newRoot);
+    });
+  };
+
+  return (
+    <input
+      type="text"
+      value={val}
+      ref={ref}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+    />
+  );
+}
+
 function TreeNode({ node }: { node: ValueNode }): JSX.Element {
   const children = node.children;
   const buttonChar = node.open ? "-" : "+";
+  const editing = useAtomValue(editingAtom);
+  const [selected, setSelected] = useAtom(selectedIdAtom);
+  const alpha = selected === node.id ? 1 : 0.2;
   const setRoot = useSetAtom(rootAtom);
   const handleOpenClick = () => {
     setRoot((root) => {
-      if (root === null) {
-        return root;
-      }
+      if (root === null) throw new Error("panic: root is null");
       const rootValue = root.getOrThrow();
-      return L(toggle(rootValue, node.id));
+      setSelected(node.id);
+      return LV(toggle(rootValue, node.id));
     });
   };
-  const selected = useAtomValue(selectedIdAtom);
-  const alpha = selected === node.id ? 1 : 0.2;
   return (
     <span>
       <button
@@ -39,8 +80,12 @@ function TreeNode({ node }: { node: ValueNode }): JSX.Element {
       >
         {buttonChar}
       </button>
-      <Suspense fallback={<div>loading content</div>}>
-        <NodeContent lContent={node.content} />
+      <Suspense fallback={<span>loading content</span>}>
+        {editing && selected === node.id ? (
+          <ContentEditor node={node} />
+        ) : (
+          <NodeContent lContent={node.content} />
+        )}
       </Suspense>
       {children && node.open ? (
         <Suspense fallback={<div>loading children</div>}>
@@ -81,10 +126,10 @@ function Root(): JSX.Element {
   }
   const children = root.getOrThrow().children;
   const [selected, setSelected] = useAtom(selectedIdAtom);
+  const [editing, setEditing] = useAtom(editingAtom);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.preventDefault();
       switch (e.key) {
         case "j":
           setSelected((prev) => {
@@ -99,6 +144,7 @@ function Root(): JSX.Element {
           });
           break;
         case "Tab":
+          e.preventDefault();
           if (selected === null) {
             return;
           }
@@ -107,8 +153,27 @@ function Root(): JSX.Element {
               return root;
             }
             const rootValue = root.getOrThrow();
-            return L(toggle(rootValue, selected));
+            return LV(toggle(rootValue, selected));
           });
+          break;
+        case "Enter":
+          if (e.keyCode === 229) {
+            return;
+          }
+          if (selected === null) {
+            return;
+          }
+          if (editing) {
+            setEditing(false);
+            return;
+          }
+          setEditing(true);
+          break;
+        case "Escape":
+          if (!editing) {
+            return;
+          }
+          setEditing(false);
           break;
         default:
           console.log("default", e.key);
@@ -119,7 +184,7 @@ function Root(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [root, selected, setRoot, setSelected]);
+  }, [editing, root, selected, setEditing, setRoot, setSelected]);
 
   return (
     <Suspense fallback={<div>loading children</div>}>
@@ -130,9 +195,11 @@ function Root(): JSX.Element {
 
 export function App(): JSX.Element {
   const [root, setRoot] = useAtom(rootAtom);
+  const setSelected = useSetAtom(selectedIdAtom);
   useEffect(() => {
-    sleep(1).then(() => setRoot(new Loadable(getRoot())));
-  }, [setRoot]);
+    setSelected(null);
+    sleep(1).then(() => setRoot(LP(getRoot())));
+  }, [setRoot, setSelected]);
 
   return (
     <>

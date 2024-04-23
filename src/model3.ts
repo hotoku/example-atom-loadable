@@ -1,5 +1,5 @@
-import { loadChildren, loadRoot } from "./api";
-import { L, Loadable } from "./loadable";
+import { loadChildren, loadRoot, saveContent as saveContentApi } from "./api";
+import { LP, LV, Loadable } from "./loadable";
 
 type Content = Loadable<string>;
 type Children = Loadable<ValueNode[]> | null;
@@ -24,21 +24,21 @@ export async function getRoot(): Promise<RootNode> {
   const items = await loadRoot();
   const ret: RootNode = {
     type: "root",
-    children: L([]),
+    children: LV([]),
   };
   const children = [];
   for (const item of items) {
     const valueNode: ValueNode = {
       type: "value",
       id: item.id,
-      content: L(item.content),
+      content: LV(item.content),
       parent: ret,
       open: false,
       children: null,
     };
     children.push(valueNode);
   }
-  ret.children = L(children);
+  ret.children = LV(children);
   return ret;
 }
 
@@ -66,13 +66,13 @@ export function toggle(root: RootNode, selected: number): RootNode {
       items.map((item) => ({
         type: "value",
         id: item.id,
-        content: L(item.content),
+        content: LV(item.content),
         parent: node,
         open: false,
         children: null,
       }))
     );
-    node.children = new Loadable(loading);
+    node.children = LP(loading);
   }
   return root;
 }
@@ -145,4 +145,13 @@ export function previousId(
     }
   }
   return curId;
+}
+
+export function saveContent(
+  root: RootNode,
+  node: ValueNode,
+  content: string
+): RootNode {
+  node.content = LP(saveContentApi(node.id, content));
+  return root;
 }

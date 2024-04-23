@@ -12,36 +12,46 @@ type LoadableState<T> =
       error: unknown;
     };
 
-export function L<T>(value: T): Loadable<T> {
-  return new Loadable(Promise.resolve(value));
+export function LP<T>(promise: Promise<T>): Loadable<T> {
+  return new Loadable({ type: "promise", promise: promise });
 }
-
-export function LWA<T, A>(value: T, attr: A): LoadableWithAttr<T, A> {
-  return new LoadableWithAttr(Promise.resolve(value), attr);
+export function LV<T>(value: T): Loadable<T> {
+  return new Loadable({ type: "value", value });
 }
 
 export class Loadable<T> {
   state: LoadableState<T>;
-  constructor(promise: Promise<T>) {
-    this.state = {
-      status: "pending",
-      promise: promise.then(
-        (data) => {
-          this.state = {
-            status: "fulfilled",
-            data,
-          };
-          return data;
-        },
-        (error) => {
-          this.state = {
-            status: "rejected",
-            error,
-          };
-          throw error;
-        }
-      ),
-    };
+  constructor(
+    val: { type: "value"; value: T } | { type: "promise"; promise: Promise<T> }
+  ) {
+    switch (val.type) {
+      case "value":
+        this.state = {
+          status: "fulfilled",
+          data: val.value,
+        };
+        break;
+      case "promise":
+        this.state = {
+          status: "pending",
+          promise: val.promise.then(
+            (data) => {
+              this.state = {
+                status: "fulfilled",
+                data,
+              };
+              return data;
+            },
+            (error) => {
+              this.state = {
+                status: "rejected",
+                error,
+              };
+              throw error;
+            }
+          ),
+        };
+    }
   }
   getOrThrow(): T {
     switch (this.state.status) {
@@ -52,13 +62,5 @@ export class Loadable<T> {
       case "rejected":
         throw this.state.error;
     }
-  }
-}
-
-export class LoadableWithAttr<T, A> extends Loadable<T> {
-  attr: A;
-  constructor(promise: Promise<T>, attr: A) {
-    super(promise);
-    this.attr = attr;
   }
 }

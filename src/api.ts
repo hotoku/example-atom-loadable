@@ -14,12 +14,10 @@ const db: {
 };
 
 export function loadRoot(): Promise<Item[]> {
-  const loadingItems = sleep(1).then(
-    () => {
-      const items = Object.values(db).filter((item) => item.parent === null);
-      return items;
-    }
-  );
+  const loadingItems = sleep(1).then(() => {
+    const items = Object.values(db).filter((item) => item.parent === null);
+    return items;
+  });
   return loadingItems;
 }
 
@@ -38,7 +36,7 @@ export function loadChildren(parent: number): Promise<Item[]> {
   return loadingItems;
 }
 
-export function updateName(id: number, v: string): Promise<string> {
+export function saveContent(id: number, v: string): Promise<string> {
   const updating = new Promise((resolve) => setTimeout(resolve, 1000)).then(
     () => {
       const item = Object.values(db).find((item) => item.id === id);
