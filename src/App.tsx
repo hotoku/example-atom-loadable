@@ -1,14 +1,14 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import {
+  Children,
   ValueNode,
-  addNode,
+  find,
   getRoot,
+  loadChildren,
   nextId,
   previousId,
-  saveContent,
-  toggle,
-} from "./model3";
-import { editingAtom, rootAtom, selectedIdAtom } from "./atoms";
+} from "./model4";
+import { editingAtom, openMapAtom, rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Loadable, LV, LP } from "./loadable";
 import { sleep } from "./api";
@@ -60,17 +60,20 @@ function ContentEditor({ node }: { node: ValueNode }): JSX.Element {
 
 function TreeNode({ node }: { node: ValueNode }): JSX.Element {
   const children = node.children;
-  const buttonChar = node.open ? "-" : "+";
   const editing = useAtomValue(editingAtom);
   const [selected, setSelected] = useAtom(selectedIdAtom);
   const alpha = selected === node.id ? 1 : 0.2;
-  const setRoot = useSetAtom(rootAtom);
+  const [openMap, setOpenMap] = useAtom(openMapAtom);
+  const open = openMap[node.id] || false;
+  const buttonChar = open ? "-" : "+";
+
   const handleOpenClick = () => {
-    setRoot((root) => {
-      if (root === null) throw new Error("panic: root is null");
-      const rootValue = root.getOrThrow();
-      setSelected(node.id);
-      return LV(toggle(rootValue, node.id));
+    if (node.children.type === "beforeLoad") {
+      loadChildren(node);
+    }
+    setSelected(node.id);
+    setOpenMap((prev) => {
+      return { ...prev, [node.id]: !open };
     });
   };
   return (
@@ -81,6 +84,7 @@ function TreeNode({ node }: { node: ValueNode }): JSX.Element {
       >
         {buttonChar}
       </button>
+      <span> {open ? "open" : "close"} / </span>
       <Suspense fallback={<span>loading content</span>}>
         {editing && selected === node.id ? (
           <ContentEditor node={node} />
@@ -88,30 +92,58 @@ function TreeNode({ node }: { node: ValueNode }): JSX.Element {
           <NodeContent lContent={node.content} />
         )}
       </Suspense>
-      {children && node.open ? (
-        <Suspense fallback={<div>loading children</div>}>
-          <TreeArray array={children} />
-        </Suspense>
-      ) : null}
+      <ul>{open ? <NodeArray children={children} /> : null}</ul>
     </span>
   );
 }
 
-function TreeArray({
+function TreeNodeLoading({
+  lNode,
+}: {
+  lNode: Loadable<ValueNode>;
+}): JSX.Element {
+  const node = lNode.getOrThrow();
+  return <TreeNode node={node} />;
+}
+
+function TreeArrayAll({
   array,
   isTop,
 }: {
   array: Loadable<ValueNode[]>;
   isTop?: boolean;
 }): JSX.Element {
-  const nodes = array.getOrThrow();
+  const loadable = array.getOrThrow();
   return (
     <ul style={{ listStyle: "none", paddingInlineStart: isTop ? 0 : "40px" }}>
-      {nodes.map((node) => {
+      {loadable.map((node) => {
+        const key = node.id;
         return (
-          <li key={node.id}>
+          <li key={key}>
+            <TreeNode node={node} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function TreeArrayPart({
+  array,
+  isTop,
+}: {
+  array: Loadable<ValueNode>[];
+  isTop?: boolean;
+}): JSX.Element {
+  return (
+    <ul style={{ listStyle: "none", paddingInlineStart: isTop ? 0 : "40px" }}>
+      {array.map((node, idx) => {
+        const key =
+          node.state.status === "fulfilled" ? node.state.data.id : "KEY-" + idx;
+        return (
+          <li key={key}>
             <Suspense fallback={<div>loading node</div>}>
-              <TreeNode node={node} />
+              <TreeNodeLoading lNode={node} />
             </Suspense>
           </li>
         );
@@ -120,14 +152,31 @@ function TreeArray({
   );
 }
 
+function NodeArray({ children }: { children: Children }): JSX.Element {
+  switch (children.type) {
+    case "beforeLoad":
+      return <div>before loading children</div>;
+    case "loadingAll":
+      return (
+        <Suspense fallback={<div>loading whole children</div>}>
+          <TreeArrayAll array={children.loadable} isTop={true} />
+        </Suspense>
+      );
+    case "loadingSome":
+      return <TreeArrayPart array={children.loadable} isTop={true} />;
+  }
+}
+
 function Root(): JSX.Element {
-  const [root, setRoot] = useAtom(rootAtom);
-  if (root === null) {
+  const [lRoot, setRoot] = useAtom(rootAtom);
+  if (lRoot === null) {
     throw new Error("panic: root is null");
   }
-  const children = root.getOrThrow().children;
+  const root = lRoot.getOrThrow();
+  const children = root.children;
   const [selected, setSelected] = useAtom(selectedIdAtom);
   const [editing, setEditing] = useAtom(editingAtom);
+  const [openMap, setOpenMap] = useAtom(openMapAtom);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,13 +200,13 @@ function Root(): JSX.Element {
           break;
         case "j":
           setSelected((prev) => {
-            const next = nextId(root.getOrThrow(), prev);
+            const next = nextId(root, prev, openMap);
             return next;
           });
           break;
         case "k":
           setSelected((prev) => {
-            const next = previousId(root.getOrThrow(), prev);
+            const next = previousId(root, prev, openMap);
             return next;
           });
           break;
@@ -165,12 +214,14 @@ function Root(): JSX.Element {
           if (selected === null) {
             break;
           }
-          setRoot((root) => {
-            if (root === null) {
-              return root;
+          if (!openMap[selected]) {
+            const node = find(root, selected);
+            if (node.children.type === "beforeLoad") {
+              loadChildren(node);
             }
-            const rootValue = root.getOrThrow();
-            return LV(toggle(rootValue, selected));
+          }
+          setOpenMap((prev) => {
+            return { ...prev, [selected]: !prev[selected] };
           });
           break;
         case "Enter":
@@ -198,24 +249,33 @@ function Root(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editing, root, selected, setEditing, setRoot, setSelected]);
+  }, [
+    editing,
+    openMap,
+    root,
+    selected,
+    setEditing,
+    setOpenMap,
+    setRoot,
+    setSelected,
+  ]);
 
-  return (
-    <Suspense fallback={<div>loading children</div>}>
-      {children ? <TreeArray array={children} isTop={true} /> : null}
-    </Suspense>
-  );
+  return <NodeArray children={children} />;
 }
 
 export function App(): JSX.Element {
   const [root, setRoot] = useAtom(rootAtom);
   const setSelected = useSetAtom(selectedIdAtom);
-  const setEditing = useSetAtom(editingAtom);
+  const setOpenMap = useSetAtom(openMapAtom);
   useEffect(() => {
     setSelected(null);
-    setEditing(false);
-    sleep(1).then(() => setRoot(LP(getRoot())));
-  }, [setEditing, setRoot, setSelected]);
+    setOpenMap({});
+    sleep(1).then(() => {
+      const root = getRoot();
+      const lRoot = LP(root);
+      setRoot(lRoot);
+    });
+  }, [setOpenMap, setRoot, setSelected]);
 
   return (
     <>
