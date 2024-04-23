@@ -1,4 +1,9 @@
-import { loadChildren, loadRoot, saveContent as saveContentApi } from "./api";
+import {
+  addItem,
+  loadChildren,
+  loadRoot,
+  saveContent as saveContentApi,
+} from "./api";
 import { LP, LV, Loadable } from "./loadable";
 
 type Content = Loadable<string>;
@@ -15,6 +20,7 @@ export type ValueNode = {
 
 export type RootNode = {
   type: "root";
+  id: null;
   children: Children;
 };
 
@@ -24,6 +30,7 @@ export async function getRoot(): Promise<RootNode> {
   const items = await loadRoot();
   const ret: RootNode = {
     type: "root",
+    id: null,
     children: LV([]),
   };
   const children = [];
@@ -153,5 +160,78 @@ export function saveContent(
   content: string
 ): RootNode {
   node.content = LP(saveContentApi(node.id, content));
+  return root;
+}
+
+export function addNode(
+  root: RootNode,
+  curId: number | null,
+  cb: (newId: number) => void
+): RootNode {
+  let parent: Node;
+  if (curId === null) {
+    parent = root;
+  } else {
+    const node = findNode(root, curId);
+    if (node === null) {
+      throw new Error("panic: node not found");
+    }
+    parent = node;
+  }
+  if (parent.type === "value") {
+    parent.open = true;
+  }
+  const children = parent.children;
+  let addingChildren: Promise<ValueNode[]>;
+  if (children === null) {
+    const loadingChildren: Promise<ValueNode[]> = loadChildren(parent.id).then(
+      (items) =>
+        items.map((item) => ({
+          type: "value",
+          id: item.id,
+          content: LV(item.content),
+          parent: parent,
+          open: false,
+          children: null,
+        }))
+    );
+    addingChildren = loadingChildren.then((items) => {
+      const newItem = addItem(parent.id).then((item) => {
+        const ret: ValueNode[] = [
+          ...items,
+          {
+            type: "value",
+            id: item.id,
+            content: LV(item.content),
+            parent: parent,
+            open: false,
+            children: null,
+          },
+        ];
+        return ret;
+      });
+      return newItem;
+    });
+  } else {
+    if (children.state.status !== "fulfilled") {
+      return root;
+    }
+    addingChildren = addItem(parent.id).then((item) => {
+      const newChild: ValueNode = {
+        type: "value",
+        id: item.id,
+        content: LV(item.content),
+        parent: parent,
+        open: false,
+        children: null,
+      };
+      return [...children.getOrThrow(), newChild];
+    });
+  }
+  addingChildren = addingChildren.then((items) => {
+    cb(items[items.length - 1].id);
+    return items;
+  });
+  parent.children = LP(addingChildren);
   return root;
 }

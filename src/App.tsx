@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import {
   ValueNode,
+  addNode,
   getRoot,
   nextId,
   previousId,
@@ -130,7 +131,24 @@ function Root(): JSX.Element {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      if (editing && !(e.key === "Enter" || e.key === "Escape")) return;
       switch (e.key) {
+        case "a":
+          if (root === null) {
+            return root;
+          } else {
+            const rootValue = root.getOrThrow();
+            const cb = (newId: number) => {
+              setRoot(() => {
+                return LV(rootValue);
+              });
+              setSelected(newId);
+            };
+            addNode(rootValue, selected, cb);
+            return LV(rootValue);
+          }
+          break;
         case "j":
           setSelected((prev) => {
             const next = nextId(root.getOrThrow(), prev);
@@ -144,7 +162,6 @@ function Root(): JSX.Element {
           });
           break;
         case "Tab":
-          e.preventDefault();
           if (selected === null) {
             break;
           }
@@ -170,9 +187,6 @@ function Root(): JSX.Element {
           setEditing(true);
           break;
         case "Escape":
-          if (!editing) {
-            break;
-          }
           setEditing(false);
           break;
         default:
@@ -196,10 +210,12 @@ function Root(): JSX.Element {
 export function App(): JSX.Element {
   const [root, setRoot] = useAtom(rootAtom);
   const setSelected = useSetAtom(selectedIdAtom);
+  const setEditing = useSetAtom(editingAtom);
   useEffect(() => {
     setSelected(null);
+    setEditing(false);
     sleep(1).then(() => setRoot(LP(getRoot())));
-  }, [setRoot, setSelected]);
+  }, [setEditing, setRoot, setSelected]);
 
   return (
     <>
