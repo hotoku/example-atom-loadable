@@ -14,7 +14,7 @@ const db: {
 };
 
 export function loadRoot(): Promise<Item[]> {
-  const loadingItems = new Promise((resolve) => setTimeout(resolve, 1000)).then(
+  const loadingItems = sleep(1).then(
     () => {
       const items = Object.values(db).filter((item) => item.parent === null);
       return items;

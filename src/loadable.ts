@@ -12,6 +12,14 @@ type LoadableState<T> =
       error: unknown;
     };
 
+export function L<T>(value: T): Loadable<T> {
+  return new Loadable(Promise.resolve(value));
+}
+
+export function LWA<T, A>(value: T, attr: A): LoadableWithAttr<T, A> {
+  return new LoadableWithAttr(Promise.resolve(value), attr);
+}
+
 export class Loadable<T> {
   state: LoadableState<T>;
   constructor(promise: Promise<T>) {
