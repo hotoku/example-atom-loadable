@@ -1,8 +1,8 @@
 import { Suspense, useEffect } from "react";
-import { ValueNode, getRoot, toggle } from "./model3";
-import { rootAtom } from "./atoms";
+import { ValueNode, getRoot, nextId, previousId, toggle } from "./model3";
+import { rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { L, Loadable, LoadableWithAttr } from "./loadable";
+import { L, Loadable } from "./loadable";
 import { sleep } from "./api";
 
 import "./App.css";
@@ -16,12 +16,7 @@ function NodeContent({
   return <span>{content}</span>;
 }
 
-function TreeNode({
-  lNode,
-}: {
-  lNode: LoadableWithAttr<ValueNode, { id: number }>;
-}): JSX.Element {
-  const node = lNode.getOrThrow();
+function TreeNode({ node }: { node: ValueNode }): JSX.Element {
   const children = node.children;
   const buttonChar = node.open ? "-" : "+";
   const setRoot = useSetAtom(rootAtom);
@@ -30,16 +25,18 @@ function TreeNode({
       if (root === null) {
         return root;
       }
-      if (root.state.status !== "fulfilled") {
-        return root;
-      }
       const rootValue = root.getOrThrow();
-      return L(toggle(rootValue, node));
+      return L(toggle(rootValue, node.id));
     });
   };
+  const selected = useAtomValue(selectedIdAtom);
+  const alpha = selected === node.id ? 1 : 0.2;
   return (
     <span>
-      <button onClick={handleOpenClick} style={{ marginRight: "5px" }}>
+      <button
+        onClick={handleOpenClick}
+        style={{ marginRight: "5px", backgroundColor: `rgba(0,0,0,${alpha})` }}
+      >
         {buttonChar}
       </button>
       <Suspense fallback={<div>loading content</div>}>
@@ -58,7 +55,7 @@ function TreeArray({
   array,
   isTop,
 }: {
-  array: Loadable<LoadableWithAttr<ValueNode, { id: number }>[]>;
+  array: Loadable<ValueNode[]>;
   isTop?: boolean;
 }): JSX.Element {
   const nodes = array.getOrThrow();
@@ -66,9 +63,9 @@ function TreeArray({
     <ul style={{ listStyle: "none", paddingInlineStart: isTop ? 0 : "40px" }}>
       {nodes.map((node) => {
         return (
-          <li key={node.attr.id}>
+          <li key={node.id}>
             <Suspense fallback={<div>loading node</div>}>
-              <TreeNode lNode={node} />
+              <TreeNode node={node} />
             </Suspense>
           </li>
         );
@@ -78,12 +75,52 @@ function TreeArray({
 }
 
 function Root(): JSX.Element {
-  const root = useAtomValue(rootAtom);
+  const [root, setRoot] = useAtom(rootAtom);
   if (root === null) {
-    throw new Error("panic");
+    throw new Error("panic: root is null");
   }
-  console.log("Root: root", root.state);
   const children = root.getOrThrow().children;
+  const [selected, setSelected] = useAtom(selectedIdAtom);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      switch (e.key) {
+        case "j":
+          setSelected((prev) => {
+            const next = nextId(root.getOrThrow(), prev);
+            return next;
+          });
+          break;
+        case "k":
+          setSelected((prev) => {
+            const next = previousId(root.getOrThrow(), prev);
+            return next;
+          });
+          break;
+        case "Tab":
+          if (selected === null) {
+            return;
+          }
+          setRoot((root) => {
+            if (root === null) {
+              return root;
+            }
+            const rootValue = root.getOrThrow();
+            return L(toggle(rootValue, selected));
+          });
+          break;
+        default:
+          console.log("default", e.key);
+          break;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [root, selected, setRoot, setSelected]);
+
   return (
     <Suspense fallback={<div>loading children</div>}>
       {children ? <TreeArray array={children} isTop={true} /> : null}
