@@ -146,7 +146,7 @@ function Root(): JSX.Element {
         case "Tab":
           e.preventDefault();
           if (selected === null) {
-            return;
+            break;
           }
           setRoot((root) => {
             if (root === null) {
@@ -158,20 +158,20 @@ function Root(): JSX.Element {
           break;
         case "Enter":
           if (e.keyCode === 229) {
-            return;
+            break;
           }
           if (selected === null) {
-            return;
+            break;
           }
           if (editing) {
             setEditing(false);
-            return;
+            break;
           }
           setEditing(true);
           break;
         case "Escape":
           if (!editing) {
-            return;
+            break;
           }
           setEditing(false);
           break;
