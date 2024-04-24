@@ -2,6 +2,7 @@ import {
   loadRoot,
   loadChildren as loadChildrenApi,
   saveContent as saveContentApi,
+  addItem,
 } from "./api";
 import { LP, LV, Loadable } from "./loadable";
 
@@ -187,4 +188,19 @@ export function find(root: RootNode, id: number): ValueNode {
 export function saveContent(node: ValueNode, content: string) {
   const saving = saveContentApi(node.id, content);
   node.content = LP(saving);
+}
+
+export function addNode(root: RootNode, selected: number | null) {
+  const parent = selected === null ? root : find(root, selected).parent;
+  const adding = addItem(selected).then((item) => {
+    const valueNode: ValueNode = {
+      type: "value",
+      id: item.id,
+      content: LV(item.content),
+      parent: root,
+      children: { type: "beforeLoad" },
+    };
+    return valueNode;
+  });
+  root.children = { type: "loadingAll", loadable: LP(adding) };
 }

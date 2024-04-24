@@ -33,12 +33,15 @@ function ContentEditor({ node }: { node: ValueNode }): JSX.Element {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("change", e.target.value);
     e.preventDefault();
     setVal(e.target.value);
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.nativeEvent.isComposing || e.key !== "Enter") return;
-    saveContent(node, val);
+    console.log("key", e.key);
+    if (!e.nativeEvent.isComposing && e.key === "Enter") {
+      saveContent(node, val);
+    }
   };
 
   return (
@@ -79,6 +82,7 @@ function TreeNode({ node }: { node: ValueNode }): JSX.Element {
         {buttonChar}
       </button>
       <span> {open ? "open" : "close"} / </span>
+      <span> {node.id} / </span>
       <Suspense fallback={<span>loading content</span>}>
         {editing && selected === node.id ? (
           <ContentEditor node={node} />
