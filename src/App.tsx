@@ -7,6 +7,7 @@ import {
   loadChildren,
   nextId,
   previousId,
+  saveContent,
 } from "./model4";
 import { editingAtom, openMapAtom, rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -26,7 +27,6 @@ function NodeContent({
 
 function ContentEditor({ node }: { node: ValueNode }): JSX.Element {
   const [val, setVal] = useState(node.content.getOrThrow());
-  const setRoot = useSetAtom(rootAtom);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     ref.current?.focus();
@@ -38,13 +38,7 @@ function ContentEditor({ node }: { node: ValueNode }): JSX.Element {
   };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing || e.key !== "Enter") return;
-    setRoot((root) => {
-      if (root === null) {
-        throw new Error("panic: root is null");
-      }
-      const newRoot = saveContent(root.getOrThrow(), node, val);
-      return LV(newRoot);
-    });
+    saveContent(node, val);
   };
 
   return (
@@ -201,6 +195,7 @@ function Root(): JSX.Element {
         case "j":
           setSelected((prev) => {
             const next = nextId(root, prev, openMap);
+            console.log("next", next);
             return next;
           });
           break;

@@ -1,4 +1,8 @@
-import { loadRoot, loadChildren as loadChildrenApi } from "./api";
+import {
+  loadRoot,
+  loadChildren as loadChildrenApi,
+  saveContent as saveContentApi,
+} from "./api";
 import { LP, LV, Loadable } from "./loadable";
 
 type Content = Loadable<string>;
@@ -178,4 +182,9 @@ export function find(root: RootNode, id: number): ValueNode {
     throw new Error("panic: node not found");
   }
   return ret;
+}
+
+export function saveContent(node: ValueNode, content: string) {
+  const saving = saveContentApi(node.id, content);
+  node.content = LP(saving);
 }
