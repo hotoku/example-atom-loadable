@@ -276,8 +276,11 @@ export function App(): JSX.Element {
     });
   }, [setOpenMap, setRoot, setSelected]);
 
+  const [val, setVal] = useState("");
   return (
     <>
+      <input type="text" value={val} onChange={(e) => setVal(e.target.value)} />
+
       <h1>todree</h1>
       {root ? (
         <Suspense fallback={<div>loading root</div>}>
