@@ -11,7 +11,7 @@ import {
   addNode,
   removeNode,
   openAllNodes,
-} from "./model4";
+} from "./model";
 import { editingAtom, openMapAtom, rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Loadable, LP } from "./loadable";

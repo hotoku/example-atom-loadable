@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { RootNode } from "./model4";
+import { RootNode } from "./model";
 import { Loadable } from "./loadable";
 
 export const selectedIdAtom = atom<number | null>(null);
