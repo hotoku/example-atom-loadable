@@ -8,10 +8,11 @@ import {
   nextId,
   previousId,
   saveContent,
+  addNode,
 } from "./model4";
 import { editingAtom, openMapAtom, rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { Loadable, LV, LP } from "./loadable";
+import { Loadable, LP } from "./loadable";
 import { sleep } from "./api";
 
 import "./App.css";
@@ -55,7 +56,8 @@ function ContentEditor({ node }: { node: ValueNode }): JSX.Element {
   );
 }
 
-function TreeNode({ node }: { node: ValueNode }): JSX.Element {
+function TreeNode({ lNode }: { lNode: Loadable<ValueNode> }): JSX.Element {
+  const node = lNode.getOrThrow();
   const children = node.children;
   const editing = useAtomValue(editingAtom);
   const [selected, setSelected] = useAtom(selectedIdAtom);
@@ -95,38 +97,7 @@ function TreeNode({ node }: { node: ValueNode }): JSX.Element {
   );
 }
 
-function TreeNodeLoading({
-  lNode,
-}: {
-  lNode: Loadable<ValueNode>;
-}): JSX.Element {
-  const node = lNode.getOrThrow();
-  return <TreeNode node={node} />;
-}
-
-function TreeArrayAll({
-  array,
-  isTop,
-}: {
-  array: Loadable<ValueNode[]>;
-  isTop?: boolean;
-}): JSX.Element {
-  const loadable = array.getOrThrow();
-  return (
-    <ul style={{ listStyle: "none", paddingInlineStart: isTop ? 0 : "40px" }}>
-      {loadable.map((node) => {
-        const key = node.id;
-        return (
-          <li key={key}>
-            <TreeNode node={node} />
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function TreeArrayPart({
+function TreeArray({
   array,
   isTop,
 }: {
@@ -137,11 +108,13 @@ function TreeArrayPart({
     <ul style={{ listStyle: "none", paddingInlineStart: isTop ? 0 : "40px" }}>
       {array.map((node, idx) => {
         const key =
-          node.state.status === "fulfilled" ? node.state.data.id : "KEY-" + idx;
+          node.state.status === "fulfilled"
+            ? node.state.data.id
+            : "notloaded-" + idx;
         return (
           <li key={key}>
             <Suspense fallback={<div>loading node</div>}>
-              <TreeNodeLoading lNode={node} />
+              <TreeNode lNode={node} />
             </Suspense>
           </li>
         );
@@ -154,14 +127,14 @@ function NodeArray({ children }: { children: Children }): JSX.Element {
   switch (children.type) {
     case "beforeLoad":
       return <div>before loading children</div>;
-    case "loadingAll":
+    case "loadStarted": {
+      const data = children.loadable.getOrThrow();
       return (
         <Suspense fallback={<div>loading whole children</div>}>
-          <TreeArrayAll array={children.loadable} isTop={true} />
+          <TreeArray array={data} isTop={true} />
         </Suspense>
       );
-    case "loadingSome":
-      return <TreeArrayPart array={children.loadable} isTop={true} />;
+    }
   }
 }
 
@@ -178,28 +151,22 @@ function Root(): JSX.Element {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.preventDefault();
       if (editing && !(e.key === "Enter" || e.key === "Escape")) return;
       switch (e.key) {
         case "a":
-          if (root === null) {
-            return root;
+          if (editing) {
+            break;
           } else {
-            const rootValue = root.getOrThrow();
-            const cb = (newId: number) => {
-              setRoot(() => {
-                return LV(rootValue);
-              });
-              setSelected(newId);
-            };
-            addNode(rootValue, selected, cb);
-            return LV(rootValue);
+            new Promise<number | null>((resolve) => {
+              const ret = addNode(root, selected, openMap);
+              setSelected(null);
+              resolve(ret);
+            }).then((v) => setSelected(v));
           }
           break;
         case "j":
           setSelected((prev) => {
             const next = nextId(root, prev, openMap);
-            console.log("next", next);
             return next;
           });
           break;
@@ -210,6 +177,7 @@ function Root(): JSX.Element {
           });
           break;
         case "Tab":
+          e.preventDefault();
           if (selected === null) {
             break;
           }
@@ -259,7 +227,11 @@ function Root(): JSX.Element {
     setSelected,
   ]);
 
-  return <NodeArray children={children} />;
+  return (
+    <Suspense fallback={<div>loading children</div>}>
+      <NodeArray children={children} />
+    </Suspense>
+  );
 }
 
 export function App(): JSX.Element {
@@ -276,11 +248,8 @@ export function App(): JSX.Element {
     });
   }, [setOpenMap, setRoot, setSelected]);
 
-  const [val, setVal] = useState("");
   return (
     <>
-      <input type="text" value={val} onChange={(e) => setVal(e.target.value)} />
-
       <h1>todree</h1>
       {root ? (
         <Suspense fallback={<div>loading root</div>}>

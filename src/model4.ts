@@ -12,12 +12,8 @@ export type Children =
       type: "beforeLoad";
     }
   | {
-      type: "loadingAll";
-      loadable: Loadable<ValueNode[]>;
-    }
-  | {
-      type: "loadingSome";
-      loadable: Loadable<ValueNode>[];
+      type: "loadStarted";
+      loadable: Loadable<Loadable<ValueNode>[]>;
     };
 
 export type ValueNode = {
@@ -36,6 +32,20 @@ export type RootNode = {
 
 type Node = ValueNode | RootNode;
 
+function item2node(item: {
+  id: number;
+  content: string;
+  parent: Node;
+}): ValueNode {
+  return {
+    type: "value",
+    id: item.id,
+    content: LV(item.content),
+    parent: item.parent,
+    children: { type: "beforeLoad" },
+  };
+}
+
 export async function getRoot(): Promise<RootNode> {
   const items = await loadRoot();
   const ret: RootNode = {
@@ -45,33 +55,25 @@ export async function getRoot(): Promise<RootNode> {
   };
   const children: Loadable<ValueNode>[] = [];
   for (const item of items) {
-    const valueNode: ValueNode = {
-      type: "value",
+    const valueNode: ValueNode = item2node({
       id: item.id,
-      content: LV(item.content),
+      content: item.content,
       parent: ret,
-      children: { type: "beforeLoad" },
-    };
+    });
     children.push(LV(valueNode));
   }
-  ret.children = { type: "loadingSome", loadable: children };
+  ret.children = { type: "loadStarted", loadable: LV(children) };
   return ret;
 }
 
 export function loadChildren(node: ValueNode) {
   const loadingChildren = loadChildrenApi(node.id).then((items) => {
-    const children: ValueNode[] = items.map((item) => {
-      return {
-        type: "value",
-        id: item.id,
-        content: LV(item.content),
-        parent: node,
-        children: { type: "beforeLoad" },
-      };
-    });
+    const children = items.map((item) =>
+      LV(item2node({ ...item, parent: node }))
+    );
     return children;
   });
-  node.children = { type: "loadingAll", loadable: LP(loadingChildren) };
+  node.children = { type: "loadStarted", loadable: LP(loadingChildren) };
 }
 
 function dfs(cur: Node, backward: boolean = false): ValueNode[] {
@@ -83,35 +85,18 @@ function dfs(cur: Node, backward: boolean = false): ValueNode[] {
   switch (children.type) {
     case "beforeLoad":
       break;
-    case "loadingAll":
+    case "loadStarted":
       {
-        const lNodes = children.loadable;
-        if (lNodes.state.status === "fulfilled") {
-          let nodes = lNodes.state.data;
+        const llNodes = children.loadable;
+        if (llNodes.state.status === "fulfilled") {
+          let lNodes = llNodes.state.data;
           if (backward) {
-            nodes = nodes.slice().reverse();
+            lNodes = lNodes.slice().reverse();
           }
-          for (const node of nodes) {
-            ret.push(...dfs(node, backward));
-          }
-        }
-      }
-      break;
-    case "loadingSome":
-      {
-        let lNodes = children.loadable;
-        if (backward) {
-          lNodes = lNodes.slice().reverse();
-        }
-        for (const lNode of lNodes) {
-          switch (lNode.state.status) {
-            case "pending":
-              break;
-            case "fulfilled":
-              ret.push(...dfs(lNode.state.data, backward));
-              break;
-            case "rejected":
-              break;
+          for (const node of lNodes) {
+            if (node.state.status === "fulfilled") {
+              ret.push(...dfs(node.getOrThrow(), backward));
+            }
           }
         }
       }
@@ -190,17 +175,56 @@ export function saveContent(node: ValueNode, content: string) {
   node.content = LP(saving);
 }
 
-export function addNode(root: RootNode, selected: number | null) {
-  const parent = selected === null ? root : find(root, selected).parent;
-  const adding = addItem(selected).then((item) => {
-    const valueNode: ValueNode = {
-      type: "value",
-      id: item.id,
-      content: LV(item.content),
-      parent: root,
-      children: { type: "beforeLoad" },
-    };
-    return valueNode;
-  });
-  root.children = { type: "loadingAll", loadable: LP(adding) };
+export function addNode(
+  root: RootNode,
+  selected: number | null,
+  openMap: Record<number, boolean>
+): Promise<number | null> {
+  let parent: Node;
+  if (selected === null) {
+    parent = root;
+  } else {
+    const cur = find(root, selected);
+    if (openMap[cur.id]) {
+      parent = cur;
+    } else {
+      parent = cur.parent;
+    }
+  }
+  switch (parent.children.type) {
+    case "beforeLoad":
+      {
+        const adding = addItem(parent.id).then((item) =>
+          item2node({ ...item, parent })
+        );
+        const loadingChildren = loadChildrenApi(parent.id).then((items) =>
+          items.map((item) => LV(item2node({ ...item, parent })))
+        );
+        const addingNode = Promise.all([adding, loadingChildren]).then(
+          ([item, children]) => {
+            children.push(LV(item));
+            return children;
+          }
+        );
+        parent.children = { type: "loadStarted", loadable: LP(addingNode) };
+        return adding.then((item) => item.id);
+      }
+      break;
+    case "loadStarted":
+      console.log("addNode: loadStarted");
+      if (parent.children.loadable.state.status === "fulfilled") {
+        const children = parent.children.loadable.state.data;
+        const adding = addItem(parent.id).then((item) =>
+          item2node({ ...item, parent })
+        );
+        parent.children = {
+          type: "loadStarted",
+          loadable: LV([...children, LP(adding)]),
+        };
+        return adding.then((item) => item.id);
+      } else {
+        return Promise.resolve(selected);
+      }
+      break;
+  }
 }
