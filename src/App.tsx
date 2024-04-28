@@ -9,6 +9,8 @@ import {
   previousId,
   saveContent,
   addNode,
+  removeNode,
+  openAllNodes,
 } from "./model4";
 import { editingAtom, openMapAtom, rootAtom, selectedIdAtom } from "./atoms";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
@@ -16,6 +18,7 @@ import { Loadable, LP } from "./loadable";
 import { sleep } from "./api";
 
 import "./App.css";
+import { useUpdate } from "./hooks";
 
 function NodeContent({
   lContent,
@@ -154,11 +157,18 @@ function Root(): JSX.Element {
       if (editing && !(e.key === "Enter" || e.key === "Escape")) return;
       switch (e.key) {
         case "a":
-          if (editing) {
-            break;
-          } else {
+          {
             new Promise<number | null>((resolve) => {
               const ret = addNode(root, selected, openMap);
+              setSelected(null);
+              resolve(ret);
+            }).then((v) => setSelected(v));
+          }
+          break;
+        case "x":
+          {
+            new Promise<number | null>((resolve) => {
+              const ret = removeNode(root, selected, openMap);
               setSelected(null);
               resolve(ret);
             }).then((v) => setSelected(v));
@@ -216,21 +226,34 @@ function Root(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [
-    editing,
-    openMap,
-    root,
-    selected,
-    setEditing,
-    setOpenMap,
-    setRoot,
-    setSelected,
-  ]);
+  }, [editing, openMap, root, selected, setEditing, setOpenMap, setSelected]);
+
+  const { update } = useUpdate();
+  const reload = () => {
+    setRoot(LP(getRoot()));
+    setOpenMap({});
+  };
+
+  const openAll = () => {
+    const map = openAllNodes(root);
+    setOpenMap(map);
+  };
 
   return (
-    <Suspense fallback={<div>loading children</div>}>
-      <NodeArray children={children} />
-    </Suspense>
+    <>
+      <div>
+        <button style={{ marginRight: "5px" }} onClick={update}>
+          update
+        </button>
+        <button style={{ marginRight: "5px" }} onClick={openAll}>
+          open all
+        </button>
+        <button onClick={reload}>reload</button>
+      </div>
+      <Suspense fallback={<div>loading children</div>}>
+        <NodeArray children={children} />
+      </Suspense>
+    </>
   );
 }
 
@@ -238,6 +261,7 @@ export function App(): JSX.Element {
   const [root, setRoot] = useAtom(rootAtom);
   const setSelected = useSetAtom(selectedIdAtom);
   const setOpenMap = useSetAtom(openMapAtom);
+
   useEffect(() => {
     setSelected(null);
     setOpenMap({});

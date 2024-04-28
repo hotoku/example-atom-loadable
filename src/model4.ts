@@ -3,6 +3,7 @@ import {
   loadChildren as loadChildrenApi,
   saveContent as saveContentApi,
   addItem,
+  deleteItem,
 } from "./api";
 import { LP, LV, Loadable } from "./loadable";
 
@@ -227,4 +228,59 @@ export function addNode(
       }
       break;
   }
+}
+
+export function removeNode(
+  root: RootNode,
+  selected: number | null,
+  openMap: Record<number, boolean>
+): Promise<number | null> {
+  if (selected === null) {
+    return Promise.resolve(selected);
+  }
+  const cur = find(root, selected);
+  const parent = cur.parent;
+  switch (parent.children.type) {
+    case "beforeLoad":
+      return Promise.resolve(selected);
+    case "loadStarted": {
+      const status = parent.children.loadable.state.status;
+      if (status === "fulfilled") {
+        const children = parent.children.loadable.state.data;
+        const idxes = children.map((node) =>
+          node.state.status === "fulfilled" ? node.state.data.id : -1
+        );
+        const idx = idxes.indexOf(selected);
+        if (idx === -1) {
+          return Promise.resolve(selected);
+        }
+        const ret = nextId(root, selected, openMap);
+        const deleting = deleteItem(selected);
+        console.log("try deleting");
+        const updating = deleting
+          .then(() => {
+            return children.filter((_, i) => i !== idx);
+          })
+          .catch((e) => {
+            console.error("removeNode error", e);
+            return children;
+          });
+        parent.children = {
+          type: "loadStarted",
+          loadable: LP(updating),
+        };
+        return deleting.then(() => ret).catch(() => selected);
+      } else {
+        return Promise.resolve(selected);
+      }
+    }
+  }
+}
+
+export function openAllNodes(root: RootNode): Record<number, boolean> {
+  const ret: Record<number, boolean> = {};
+  dfs(root).forEach((node) => {
+    ret[node.id] = true;
+  });
+  return ret;
 }

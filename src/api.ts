@@ -53,9 +53,20 @@ export function saveContent(id: number, v: string): Promise<string> {
 export function addItem(parentId: number | null): Promise<Item> {
   const adding = sleep(1).then(() => {
     const id = Math.max(...Object.keys(db).map(Number)) + 1;
-    const item = { id, content: "" + id, parent: parentId };
+    const item = { id, content: "new item", parent: parentId };
     db[id] = item;
     return item;
   });
   return adding;
+}
+
+export function deleteItem(id: number): Promise<void> {
+  const children = Object.values(db).filter((item) => item.parent === id);
+  const deleting = sleep(1).then(() => {
+    if (children.length > 0) {
+      throw new Error("Cannot delete node with children");
+    }
+    delete db[id];
+  });
+  return deleting;
 }
